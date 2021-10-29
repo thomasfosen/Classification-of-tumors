@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import accuracy_score
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -21,12 +20,12 @@ headers = [ \
     'Mitoses', \
     'Class']
 
-# read data and remove incomplete rows
+# read data, assign headers and remove incomplete rows
 data = pd.read_csv('breast-cancer-wisconsin.data', header = None, names = headers)
-data = data[data.BareNuclei != "?"]
+data = data[data.BareNuclei != "?"] # Creates new data without compromised rows
 array = np.asarray(data).astype('float32')
 
-# normalize output variables
+# normalize output variables --> 1 indicates malignant, 0 indicates benign
 for i in range(len(array)):
     if array[i, -1] == 2:
         array[i, -1] = 0
@@ -34,17 +33,14 @@ for i in range(len(array)):
         array[i, -1] = 1
 
 # split to training and testing set
-
-splitPerc = 0.8 #adjustable split percentage between training and test data
-trainingData = array[:round(len(array)*splitPerc)]
-testingData = array[round(len(array)*splitPerc):]
-
+splitPercentage = 0.8 #adjustable split percentage between training and test data
+trainingData = array[:round(len(array)*splitPercentage)]
+testingData = array[round(len(array)*splitPercentage):]
 
 
 # create test and train tensors
 xTrain =  tf.convert_to_tensor(trainingData[:, 1 : -1])
 yTrain = tf.convert_to_tensor(trainingData[:,-1])
-
 xTest = tf.convert_to_tensor(testingData[:, 1 : -1])
 yTest = tf.convert_to_tensor(testingData[:, -1])
 
@@ -52,33 +48,53 @@ yTest = tf.convert_to_tensor(testingData[:, -1])
 ''' Creating model '''
 
 
-# Define Sequential model with 3 layers
+# Initiate model
 model = keras.Sequential(
     [
-        layers.Dense(10, activation="relu", name="inputLayer"),
-        layers.Dense(15, activation="relu", name="hiddenLayer"),
-        layers.Dense(1, name="outputLayer"),
+        layers.Dense(10, activation = "relu", name = "inputLayer"),
+        layers.Dense(20, activation = "relu", name = "hiddenLayer"),
+        layers.Dense(1, name = "outputLayer"),
     ]
 )
 
+# Compile model
 model.compile(
-    loss=tf.keras.losses.binary_crossentropy,
-    optimizer=tf.keras.optimizers.Adam(learning_rate = 0.001),
-    metrics=[
+    loss = tf.keras.losses.binary_crossentropy,
+    optimizer = tf.keras.optimizers.Adam(learning_rate = 1e-3),
+    metrics = [
         tf.keras.metrics.BinaryAccuracy(name='accuracy'),
     ]
 )
 
-history = model.fit(xTrain, yTrain, epochs = 15)
+
+fitModel = model.fit(xTrain, yTrain, epochs = 15)
+classificationValues = model.predict(xTest)
 
 
-#make predictions
+# Check and calculate final accuracy
+for i in range(len(classificationValues)):
+    if classificationValues[i] < 0.5:
+        classificationValues[i] = 0
+    else:
+        classificationValues[i] = 1
 
-predictions = model.predict(xTest)
+results = open('results2.txt', 'w')
+results.write(str(classificationValues))
+results.close()
 
-#turn into classes
-prediction_classes = [
-    1 if prob > 0.5 else 0 for prob in np.ravel(predictions)
-]
+wrong = 0
+right = 0
 
-print(f'Accuracy: {accuracy_score(yTest, prediction_classes):.2f}')
+for i in range(len(classificationValues)):
+    if classificationValues[i] == testingData[i, -1]:
+        right += 1
+    else:
+        wrong += 1
+
+accuracy = right / (wrong + right)
+
+print('Right predictions: ' + str(right))
+print('Wrong predictions: ' + str(wrong))
+print("Final accuracy: " + str(accuracy))
+
+model.save('model2')
